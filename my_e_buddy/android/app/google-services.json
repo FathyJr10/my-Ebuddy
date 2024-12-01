@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "334875306446",
+    "project_id": "my-e-buddy",
+    "storage_bucket": "my-e-buddy.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:334875306446:android:73f1c06c6d724ebbc7a39f",
+        "android_client_info": {
+          "package_name": "com.example.buddy"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAYzmPcvUdnSpxPvkWYF0LDGkD9J15HM3M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
