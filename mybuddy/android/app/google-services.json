@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "84064725515",
+    "project_id": "my1234app",
+    "storage_bucket": "my1234app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:84064725515:android:af1625cc604c793444350e",
+        "android_client_info": {
+          "package_name": "com.example.mybuddy"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDTYpzBK4jXe_WC4O_knj3kCyca7WM0opQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
