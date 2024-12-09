@@ -15,7 +15,7 @@ Cross-Platform: Built with Flutter for a smooth experience on both Android and i
 
 ## Tech Stack
 Frontend: Flutter
-Backend: Firebase (Auth, Firestore)
+Backend: Firebase 
 AI: OpenAI API (GPT)
 
 ## Setup and Installation
