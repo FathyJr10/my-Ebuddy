@@ -2,7 +2,9 @@ import 'package:dash_chat_2/dash_chat_2.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_gemini/flutter_gemini.dart';
 import 'package:mybuddy/auth/auth_functions.dart';
+import 'package:mybuddy/consts.dart';
 import 'package:mybuddy/pages/contSignup.dart';
 import 'package:mybuddy/pages/homepage.dart';
 import 'package:mybuddy/pages/loginpage.dart';
@@ -10,6 +12,7 @@ import 'package:mybuddy/pages/signup.dart';
 import 'package:mybuddy/pages/verifyUser.dart';
 
 void main() async {
+  Gemini.init(apiKey: apiKEY);
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   runApp(const MyApp());

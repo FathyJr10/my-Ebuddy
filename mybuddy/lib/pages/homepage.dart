@@ -1,10 +1,14 @@
 // ignore_for_file: use_build_context_synchronously
 
-import 'package:chat_gpt_sdk/chat_gpt_sdk.dart';
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dash_chat_2/dash_chat_2.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_gemini/flutter_gemini.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:mybuddy/auth/auth_functions.dart';
 import 'package:mybuddy/consts.dart';
 
@@ -17,12 +21,14 @@ class Homepage extends StatefulWidget {
 
 class _HomepageState extends State<Homepage> {
   String userId = FirebaseAuth.instance.currentUser!.uid;
+  final Gemini geminiBot = Gemini.instance;
   List<ChatMessage> _messages = <ChatMessage>[];
   List<ChatUser> _typingUsers = <ChatUser>[];
   Map<String, dynamic>? userData;
   late ChatUser _currentUser;
-  static const String gptUserId = 'chat_gpt_1';
-  final ChatUser _gptChatUser = ChatUser(id: gptUserId, firstName: 'ChatGpt');
+  static const String botUserId = 'chat_bot_1';
+  final ChatUser _chatBotUser = ChatUser(
+      id: botUserId, firstName: 'Chat Bot', profileImage: 'assets/logo.png');
   // Fetch the user data from Firestore and set _currentUser dynamically
   Future<void> fetchUserData() async {
     try {
@@ -65,11 +71,6 @@ class _HomepageState extends State<Homepage> {
     fetchUserData(); // Fetch user data on app start
   }
 
-  final _openAI = OpenAI.instance.build(
-      token: OpenAI_API_KEY, //Put the token you got from open AI
-      baseOption: HttpSetup(receiveTimeout: const Duration(seconds: 5)),
-      enableLog: true);
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -101,76 +102,160 @@ class _HomepageState extends State<Homepage> {
               child: CircularProgressIndicator(),
             ))
           : DashChat(
+              inputOptions: InputOptions(trailing: [
+                IconButton(
+                    onPressed: () {
+                      _chooseImageSource();
+                    },
+                    icon: const Icon(Icons.image))
+              ]),
               messageOptions: const MessageOptions(
                   currentUserContainerColor: Color.fromARGB(255, 104, 171, 182),
                   containerColor: Colors.white,
-                  textColor: Colors.white),
+                  textColor: Colors.black),
               currentUser: _currentUser,
               typingUsers: _typingUsers,
-              onSend: (ChatMessage message) {
-                getChatResponse(message);
-              },
+              onSend: _sendMessage,
               messages: _messages,
             ),
     );
   }
 
   // Function to get response from OpenAI
-  Future<void> getChatResponse(ChatMessage message) async {
-    print("User message: ${message.text}");
 
-    // Add user message to the list and show typing indicator
+  void _sendMessage(ChatMessage chatMessage) {
     setState(() {
-      _messages.insert(0, message);
-      _typingUsers.add(_gptChatUser);
+      _messages = [chatMessage, ..._messages];
     });
+    try {
+      String question = chatMessage.text;
+      List<Uint8List>? images;
+      if (chatMessage.medias?.isNotEmpty ?? false) {
+        images = [File(chatMessage.medias!.first.url).readAsBytesSync()];
+      }
+      geminiBot
+          .streamGenerateContent(
+        question,
+        images: images,
+      )
+          .listen((event) {
+        ChatMessage? lastMessage = _messages.firstOrNull;
+        if (lastMessage != null && lastMessage.user == _chatBotUser) {
+          lastMessage = _messages.removeAt(0);
+          String response = event.content?.parts?.fold(
+                  "", (previous, current) => "$previous ${current.text}") ??
+              "";
+          lastMessage.text += response;
+          setState(
+            () {
+              _messages = [lastMessage!, ..._messages];
+            },
+          );
+        } else {
+          String response = event.content?.parts?.fold(
+                  "", (previous, current) => "$previous ${current.text}") ??
+              "";
+          ChatMessage message = ChatMessage(
+              user: _chatBotUser, createdAt: DateTime.now(), text: response);
+          setState(() {
+            _messages = [message, ..._messages];
+          });
+        }
+      });
+    } catch (e) {
+      print('the error is ${e}');
+    }
+  }
 
-    // Build chat history
-    final _messagesHistory = _messages.reversed.map((m) {
-      return {
-        "role": m.user == _currentUser ? "user" : "assistant",
-        "content": m.text,
-      };
-    }).toList();
-
-    final request = ChatCompleteText(
-      model: GptTurboChatModel(), // Specify the model
-      messages: _messagesHistory,
-      maxToken: 200,
+  //send media message
+  void _chooseImageSource() async {
+    // Show a dialog to choose between gallery or camera
+    final ImageSource? source = await showDialog<ImageSource>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Select Image Source'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: const Text('Camera'),
+                onTap: () {
+                  Navigator.pop(
+                      context, ImageSource.camera); // Return camera source
+                },
+              ),
+              ListTile(
+                title: const Text('Gallery'),
+                onTap: () {
+                  Navigator.pop(
+                      context, ImageSource.gallery); // Return gallery source
+                },
+              ),
+            ],
+          ),
+        );
+      },
     );
 
-    try {
-      // Fetch response
-      final response = await _openAI.onChatCompletion(request: request);
+    // Proceed if the user selected a source
+    if (source != null) {
+      _pickImage(
+          source); // Call function to pick image based on selected source
+    }
+  }
 
-      if (response?.choices.isNotEmpty ?? false) {
-        for (var element in response!.choices) {
-          if (element.message != null) {
-            setState(() {
-              _messages.insert(
-                0,
-                ChatMessage(
-                  user: _gptChatUser,
-                  createdAt: DateTime.now(),
-                  text: element.message!.content,
-                ),
-              );
-            });
-          }
-        }
-      } else {
-        print("No response received.");
-      }
-    } catch (e) {
-      print("Error occurred: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to fetch response: $e")),
+  void _pickImage(ImageSource source) async {
+    ImagePicker picker = ImagePicker();
+    XFile? file = await picker.pickImage(source: source);
+
+    if (file != null) {
+      // Show a dialog to let the user enter the text
+      final userText = await showDialog<String>(
+        context: context,
+        builder: (BuildContext context) {
+          String inputText = '';
+          return AlertDialog(
+            title: const Text('Enter your message'),
+            content: TextField(
+              onChanged: (value) {
+                inputText = value;
+              },
+              decoration: const InputDecoration(
+                hintText: 'Describe the image',
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, null), // Cancel
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, inputText), // Submit
+                child: const Text('Send'),
+              ),
+            ],
+          );
+        },
       );
-    } finally {
-      // Remove typing indicator
-      setState(() {
-        _typingUsers.remove(_gptChatUser);
-      });
+
+      // Proceed only if the user entered some text
+
+      ChatMessage chatMessage = ChatMessage(
+        user: _currentUser,
+        createdAt: DateTime.now(),
+        text: userText ?? "describe the image",
+        medias: [
+          ChatMedia(
+            url: file.path,
+            fileName: 'image',
+            type: MediaType.image,
+          ),
+        ],
+      );
+
+      // Send the message
+      _sendMessage(chatMessage);
     }
   }
 }
